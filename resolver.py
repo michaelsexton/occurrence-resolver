@@ -1,15 +1,23 @@
 import requests
+import logging
+import logging.config
 from xml.etree import ElementTree
 
 class OccurrenceResolver:
 
-  ns = {'mo' : 'http://xmlns.geoscience.gov.au/minoccml/1.0'}
 
+  logging.config.fileConfig('logging.conf')
+
+  logger = logging.getLogger('simpleExample')
+  ns = {'mo' : 'http://xmlns.geoscience.gov.au/minoccml/1.0'}
+  
+  max_features = 10
+    
   parameters = {
     'service': 'WFS',
     'version' : '1.1.0',
     'request' : 'GetFeature',
-    'maxFeatures' : 50
+    'maxFeatures' : max_features
   }
 
   feature_types = {'mo:MinOccView' : {
@@ -29,6 +37,24 @@ class OccurrenceResolver:
     self.lite_version = lite_version
     self.er_version = er_version
     self.set_namespace()
+    self.total = 10
+    #self.total = self.get_total()
+    print(self.total)
+    
+  def get_total(self):
+    parameters = {
+      'service': 'WFS',
+      'version' : '1.1.0',
+      'request' : 'GetFeature',
+      'typeName' : self.feature_type,
+      'resultType' : 'hits'
+    }
+    response = requests.get(self.endpoint, params=parameters)
+    root = ElementTree.fromstring(response.text)
+    num_features = int(root.attrib['numberOfFeatures'])
+    self.logger.info('Number of features for %s: %d', self.state, num_features )
+    return num_features
+    
 
   def set_namespace(self):
     if self.lite_version == 1:
@@ -47,15 +73,17 @@ class OccurrenceResolver:
       self.ns['er'] = 'http://xmlns.earthresourceml.org/EarthResource/2.0'
 
   def process_endpoints(self):
-
-    self.parameters['typeName'] = self.feature_type
-    response=requests.get(self.endpoint, params=self.parameters)
-    
-    print(response.url)
-    root = ElementTree.fromstring(response.text)
-    occurrences_path = "gml:featureMembers/" + self.feature_type
-    features = root.findall('gml:featureMembers', self.ns) or root.findall('gml:featureMember', self.ns) or root.findall('wfs:member', self.ns)
-    self.process_features(features)
+    start_index = 0
+    while start_index < self.total:
+      self.parameters['startIndex'] = start_index
+      self.parameters['typeName'] = self.feature_type
+      response=requests.get(self.endpoint, params=self.parameters)
+      print(response.url)
+      root = ElementTree.fromstring(response.text)
+      occurrences_path = "gml:featureMembers/" + self.feature_type
+      features = root.findall('gml:featureMembers', self.ns) or root.findall('gml:featureMember', self.ns) or root.findall('wfs:member', self.ns)
+      self.process_features(features)
+      start_index = start_index + self.max_features
 
   def process_features(self, features):
     for feature in features:
@@ -120,7 +148,7 @@ class OccurrenceResolver:
       order = node.find('er:commodityRank',self.ns)
 
       importance = node.find('er:commodityImportance', self.ns)
-      if order is not None:
+      if order is not None and order.text is not None:
         order = int(order.text)
       if importance is not None:
         importance = importance.text
