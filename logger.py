@@ -1,8 +1,7 @@
 import logging
 import logging.handlers
-from logging import NullHandler
-import yaml
-import os, sys
+import os
+import sys
 
 ERROR = logging.ERROR
 WARNING = logging.WARNING
@@ -15,6 +14,7 @@ LOG_SIZE = 10.0
 LOG_NR = 20
 
 dateTimeFormat = '%Y-%m-%d %H:%M:%S'
+
 
 class Logger(object):
     
@@ -85,8 +85,9 @@ class Logger(object):
             else:
                 self.logger.log(level, message, *args, **kwargs)
         except Exception as e:
-            if msg and msg.strip():  # Otherwise creates empty messages in log...
-                print(msg.strip())
+            if message and message.strip(): 
+                print(message.strip())
+
 
 class Wrapper(object):
    
@@ -101,10 +102,13 @@ class Wrapper(object):
         except AttributeError:
             return getattr(self.instance, name)
 
+
 _globals = sys.modules[__name__] = Wrapper(sys.modules[__name__])  # pylint: disable=invalid-name
-        
+
+
 def init_logging(*args, **kwargs):
     return Wrapper.instance.init_logging(*args, **kwargs)
-               
+
+
 def log(*args, **kwargs):
     return Wrapper.instance.log(*args, **kwargs)
